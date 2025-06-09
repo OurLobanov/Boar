@@ -2,6 +2,7 @@ package ac.boar.anticheat.check.api.holder;
 
 import ac.boar.anticheat.Boar;
 import ac.boar.anticheat.check.api.Check;
+import ac.boar.anticheat.check.impl.aura.Aura;
 import ac.boar.anticheat.check.api.annotations.CheckInfo;
 import ac.boar.anticheat.check.impl.badpackets.BadPacketA;
 import ac.boar.anticheat.check.impl.prediction.DebugOffsetA;
@@ -19,6 +20,7 @@ public class CheckHolder extends HashMap<Class<?>, Check> {
         this.put(Timer.class, new Timer(player));
 
         this.put(Reach.class, new Reach(player));
+        //this.put(Aura.class, new Aura(player));
 
         this.put(Velocity.class, new Velocity(player));
         this.put(DebugOffsetA.class, new DebugOffsetA(player));
