@@ -12,8 +12,11 @@ import ac.boar.anticheat.util.math.Vec3;
 import lombok.RequiredArgsConstructor;
 import org.cloudburstmc.math.GenericMath;
 import org.cloudburstmc.math.vector.Vector3i;
+import org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
 import org.geysermc.erosion.util.BlockPositionIterator;
+import org.geysermc.geyser.level.BedrockDimension;
+import org.geysermc.geyser.level.block.Blocks;
 import org.geysermc.geyser.level.block.Fluid;
 
 @RequiredArgsConstructor
@@ -35,6 +38,8 @@ public class EntityTicker {
         this.updateWaterState();
         this.updateSubmergedInWaterState();
         this.updateSwimming();
+
+        player.soulSandBelow = player.compensatedWorld.getBlockState(player.getOnPos(1.0E-3F), 0).getState().is(Blocks.SOUL_SAND);
     }
 
     private void updateSwimming() {
@@ -46,8 +51,8 @@ public class EntityTicker {
     private void updateWaterState() {
         player.fluidHeight.clear();
         this.checkWaterState();
-
-        this.updateFluidHeightAndDoFluidPushing(0F, Fluid.LAVA);
+        this.updateFluidHeightAndDoFluidPushing(player.compensatedWorld.getDimension().bedrockId() ==
+                BedrockDimension.DEFAULT_NETHER_ID ? 0.007F : 0.0023333333333333335F, Fluid.LAVA);
     }
 
     private void updateSubmergedInWaterState() {
@@ -64,6 +69,8 @@ public class EntityTicker {
         if (e > eyePosition) {
             player.submergedFluidTag.add(lv4.fluid());
         }
+
+        player.submergedFluidTag.remove(Fluid.EMPTY); // not needed lol.
     }
 
     void checkWaterState() {
@@ -80,10 +87,13 @@ public class EntityTicker {
             return false;
         }
 
-        final Box box = player.boundingBox.expand(0, -0.3F, 0).contract(0.001F);
-        final BlockPositionIterator iterator = BlockPositionIterator.fromMinMax(
-                GenericMath.floor(box.minX), GenericMath.floor(box.minY), GenericMath.floor(box.minZ),
-                GenericMath.ceil(box.maxX), GenericMath.ceil(box.maxY), GenericMath.ceil(box.maxZ));
+        Box box = player.boundingBox.contract(0.001F);
+
+        // Ugly workaround but works.
+        boolean notSwimming = !player.getInputData().contains(PlayerAuthInputData.START_SWIMMING) && !player.getFlagTracker().has(EntityFlag.SWIMMING);
+        if (player.submergedFluidTag.isEmpty() && notSwimming && !(player.unvalidatedTickEnd.y > player.velocity.y && tag == Fluid.LAVA) && !affectedByFluid(tag)) {
+            box = player.boundingBox.expand(0, -0.3F, 0).contract(0.001F);
+        }
 
         float maxFluidHeight = 0.0F;
         boolean bl = /* this.isPushedByFluid(); */ true;
@@ -92,23 +102,29 @@ public class EntityTicker {
         int fluidCount = 0;
 
         Mutable mutable = new Mutable();
-        for (iterator.reset(); iterator.hasNext(); iterator.next()) {
-            mutable.set(iterator.getX(), iterator.getY(), iterator.getZ());
 
-            float f;
-            FluidState fluidState = player.compensatedWorld.getFluidState(iterator.getX(), iterator.getY(), iterator.getZ());
-            if (fluidState.fluid() != (tag) || !((f = (float)iterator.getY() + fluidState.getHeight(player, mutable)) >= box.minY)) continue;
-            found = true;
-            maxFluidHeight = Math.max(f - box.minY, maxFluidHeight);
-            if (!bl) continue;
-            Vec3 vec32 = fluidState.getFlow(player, Vector3i.from(iterator.getX(), iterator.getY(), iterator.getZ()), fluidState);
-//            if (maxFluidHeight < 0.4) {
-//                vec32 = vec32.multiply(maxFluidHeight);
-//            }
+        int i = GenericMath.floor(box.minX);
+        int j = GenericMath.ceil(box.maxX);
+        int k = GenericMath.floor(box.minY);
+        int l = GenericMath.ceil(box.maxY);
+        int m = GenericMath.floor(box.minZ);
+        int n = GenericMath.ceil(box.maxZ);
+        for (int p = i; p < j; ++p) {
+            for (int q = k; q < l; ++q) {
+                for (int r = m; r < n; ++r) {
+                    FluidState fluidState = player.compensatedWorld.getFluidState(p, q, r);
+                    float f = (float)q + fluidState.getHeight(player, mutable);
+                    if (fluidState.fluid() != (tag) || !(f >= box.minY)) continue;
+                    found = true;
+                    maxFluidHeight = Math.max(f - box.minY, maxFluidHeight);
+                    if (!bl) continue;
+                    Vec3 vec32 = fluidState.getFlow(player, Vector3i.from(p, q, r), fluidState);
 
-            player.affectedByFluidPushing = true;
-            fluidPushVelocity = fluidPushVelocity.add(vec32);
-            ++fluidCount;
+                    player.affectedByFluidPushing = vec32.lengthSquared() > 0;
+                    fluidPushVelocity = fluidPushVelocity.add(vec32);
+                    ++fluidCount;
+                }
+            }
         }
 
         if (fluidPushVelocity.length() > 0.0) {
@@ -133,6 +149,35 @@ public class EntityTicker {
         player.fluidHeight.put(tag, maxFluidHeight);
 
         return found;
+    }
+
+    private boolean affectedByFluid(Fluid tag) {
+        Box box = player.boundingBox.contract(0.001F);
+
+        Mutable mutable = new Mutable();
+
+        int i = GenericMath.floor(box.minX);
+        int j = GenericMath.ceil(box.maxX);
+        int k = GenericMath.floor(box.minY);
+        int l = GenericMath.ceil(box.maxY);
+        int m = GenericMath.floor(box.minZ);
+        int n = GenericMath.ceil(box.maxZ);
+        for (int p = i; p < j; ++p) {
+            for (int q = k; q < l; ++q) {
+                for (int r = m; r < n; ++r) {
+                    FluidState fluidState = player.compensatedWorld.getFluidState(p, q, r);
+                    float f = (float) q + fluidState.getHeight(player, mutable);
+                    if (fluidState.fluid() != (tag) || !(f >= box.minY)) continue;
+                    Vec3 vec32 = fluidState.getFlow(player, Vector3i.from(p, q, r), fluidState);
+
+                    if (vec32.lengthSquared() > 0) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     protected void applyEffectsFromBlocks() {
