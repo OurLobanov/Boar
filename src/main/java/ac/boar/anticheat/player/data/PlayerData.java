@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.cloudburstmc.math.vector.Vector2f;
 import org.cloudburstmc.math.vector.Vector3f;
+import org.cloudburstmc.math.vector.Vector3i;
 import org.cloudburstmc.protocol.bedrock.data.Ability;
 import org.cloudburstmc.protocol.bedrock.data.GameType;
 import org.cloudburstmc.protocol.bedrock.data.InputMode;
@@ -105,9 +106,6 @@ public class PlayerData {
     public Vec3 unvalidatedTickEnd = Vec3.ZERO;
     public final Map<Long, VelocityData> queuedVelocities = Collections.synchronizedMap(new TreeMap<>());
 
-    public boolean affectedByFluidPushing = false;
-    public Vec3 guessedFluidPushingVelocity;
-
     // Attribute related, abilities
     public final Map<String, AttributeInstance> attributes = new HashMap<>();
     public final Set<Ability> abilities = new HashSet<>();
@@ -148,6 +146,8 @@ public class PlayerData {
 
     public float fallDistance = 0;
 
+    public boolean hasDepthStrider;
+
     public boolean submergedInWater, touchingWater;
     public boolean wasInPowderSnow, inPowderSnow;
 
@@ -163,8 +163,11 @@ public class PlayerData {
     public final List<Fluid> submergedFluidTag = new CopyOnWriteArrayList<>();
 
     public BlockState inBlockState;
+    public boolean scaffoldDescend;
 
     public VehicleData vehicleData = null;
+
+    public int tickSinceBlockResync;
 
     public final EntityDimensions getDimensions(Pose pose) {
         return PlayerTicker.POSES.get(pose);

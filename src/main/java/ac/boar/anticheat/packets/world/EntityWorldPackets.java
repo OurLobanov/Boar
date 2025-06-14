@@ -85,7 +85,7 @@ public class EntityWorldPackets implements PacketListener {
             }
 
             final EntityCache entity = player.compensatedWorld.getEntity(packet.getRuntimeEntityId());
-            if (entity == null || packet.getMode() == MovePlayerPacket.Mode.HEAD_ROTATION) {
+            if (entity == null) {
                 return;
             }
 

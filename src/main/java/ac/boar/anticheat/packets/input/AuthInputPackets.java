@@ -1,5 +1,6 @@
 package ac.boar.anticheat.packets.input;
 
+import ac.boar.anticheat.check.impl.timer.Timer;
 import ac.boar.anticheat.data.input.TickData;
 import ac.boar.anticheat.data.input.VelocityData;
 import ac.boar.anticheat.packets.input.legacy.LegacyAuthInputPackets;
@@ -31,16 +32,25 @@ public class AuthInputPackets implements PacketListener {
 
         LegacyAuthInputPackets.processAuthInput(player, packet, true);
 
+        Timer timer = (Timer) player.getCheckHolder().get(Timer.class);
+
         boolean handleRewind = true;
         if (player.tick == Long.MIN_VALUE) {
-            player.tick = Math.max(0, packet.getTick()) - 1;
+            if (timer == null) {
+                player.tick = Math.max(0, packet.getTick()) - 1;
+            }
             handleRewind = false;
         }
-        player.tick++;
-        if (packet.getTick() != player.tick || packet.getTick() < 0) {
-            player.postTick();
-            player.kick("Invalid tick id=" + packet.getTick());
-            return;
+        if (timer != null) {
+            if (timer.tick(packet.getTick())) {
+                return;
+            }
+        } else {
+            player.tick++;
+            if (packet.getTick() != player.tick || packet.getTick() < 0) {
+                player.kick("Invalid tick id=" + packet.getTick());
+                return;
+            }
         }
 
         player.sinceTeleport++;
@@ -65,7 +75,7 @@ public class AuthInputPackets implements PacketListener {
         this.processQueuedTeleports(player, packet, handleRewind);
 
         player.postTick();
-        if (player.isAbilityExempted()) {
+        if (player.isFullyExempted()) {
             LegacyAuthInputPackets.processAuthInput(player, packet, true);
             player.velocity = player.unvalidatedTickEnd.clone();
             player.setPos(player.unvalidatedPosition);
@@ -137,7 +147,7 @@ public class AuthInputPackets implements PacketListener {
     }
 
     private void processRewind(final BoarPlayer player, final TeleportCache.Rewind rewind, final PlayerAuthInputPacket packet) {
-        if (player.isAbilityExempted()) { // Fully exempted from rewind teleport.
+        if (player.isFullyExempted()) { // Fully exempted from rewind teleport.
             return;
         }
 

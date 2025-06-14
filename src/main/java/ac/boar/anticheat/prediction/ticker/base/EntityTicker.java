@@ -1,6 +1,7 @@
 package ac.boar.anticheat.prediction.ticker.base;
 
 import ac.boar.anticheat.collision.Collider;
+import ac.boar.anticheat.collision.util.CuboidBlockIterator;
 import ac.boar.anticheat.data.block.BoarBlockState;
 import ac.boar.anticheat.data.FluidState;
 import ac.boar.anticheat.player.BoarPlayer;
@@ -28,9 +29,6 @@ public class EntityTicker {
     }
 
     public void baseTick() {
-        player.affectedByFluidPushing = false;
-        player.guessedFluidPushingVelocity = Vec3.ZERO;
-
         player.inBlockState = null;
 
         player.wasInPowderSnow = player.inPowderSnow;
@@ -87,97 +85,42 @@ public class EntityTicker {
             return false;
         }
 
-        Box box = player.boundingBox.contract(0.001F);
+        Box box = player.boundingBox.expand(0, -0.4F, 0).contract(0.001F);
 
-        // Ugly workaround but works.
-        boolean notSwimming = !player.getInputData().contains(PlayerAuthInputData.START_SWIMMING) && !player.getFlagTracker().has(EntityFlag.SWIMMING);
-        if (player.submergedFluidTag.isEmpty() && notSwimming && !(player.unvalidatedTickEnd.y > player.velocity.y && tag == Fluid.LAVA) && !affectedByFluid(tag)) {
-            box = player.boundingBox.expand(0, -0.3F, 0).contract(0.001F);
-        }
+        int i = GenericMath.floor(box.minX);
+        int j = GenericMath.floor(box.maxX + 1.0D);
+        int k = GenericMath.floor(box.minY);
+        int l = GenericMath.floor(box.maxY + 1.0D);
+        int i1 = GenericMath.floor(box.minZ);
+        int j1 = GenericMath.floor(box.maxZ + 1.0D);
 
-        float maxFluidHeight = 0.0F;
-        boolean bl = /* this.isPushedByFluid(); */ true;
         boolean found = false;
-        Vec3 fluidPushVelocity = Vec3.ZERO;
-        int fluidCount = 0;
-
+        Vec3 vec3 = new Vec3(0, 0, 0);
+        float maxFluidHeight = 0;
         Mutable mutable = new Mutable();
 
-        int i = GenericMath.floor(box.minX);
-        int j = GenericMath.ceil(box.maxX);
-        int k = GenericMath.floor(box.minY);
-        int l = GenericMath.ceil(box.maxY);
-        int m = GenericMath.floor(box.minZ);
-        int n = GenericMath.ceil(box.maxZ);
-        for (int p = i; p < j; ++p) {
-            for (int q = k; q < l; ++q) {
-                for (int r = m; r < n; ++r) {
-                    FluidState fluidState = player.compensatedWorld.getFluidState(p, q, r);
-                    float f = (float)q + fluidState.getHeight(player, mutable);
-                    if (fluidState.fluid() != (tag) || !(f >= box.minY)) continue;
+        for (int k1 = i; k1 < j; ++k1) { for (int l1 = k; l1 < l; ++l1) { for (int i2 = i1; i2 < j1; ++i2) {
+            mutable.set(k1, l1, i2);
+            FluidState fluidState = player.compensatedWorld.getFluidState(mutable);
+
+            if (fluidState.fluid() == tag) {
+                float d0 = l1 + 1 - fluidState.height();
+                maxFluidHeight = Math.max(maxFluidHeight, d0);
+
+                if (l >= d0) {
                     found = true;
-                    maxFluidHeight = Math.max(f - box.minY, maxFluidHeight);
-                    if (!bl) continue;
-                    Vec3 vec32 = fluidState.getFlow(player, Vector3i.from(p, q, r), fluidState);
-
-                    player.affectedByFluidPushing = vec32.lengthSquared() > 0;
-                    fluidPushVelocity = fluidPushVelocity.add(vec32);
-                    ++fluidCount;
+                    vec3 = fluidState.getFlow(player, Vector3i.from(k1, l1, i2));
                 }
             }
+        }}}
+
+        if (vec3.lengthSquared() > 0.0D) {
+            vec3 = vec3.normalize();
+            player.velocity = player.velocity.add(vec3.multiply(speed));
         }
 
-        if (fluidPushVelocity.length() > 0.0) {
-            if (fluidCount > 0) {
-                fluidPushVelocity = fluidPushVelocity.multiply(1.0F / fluidCount);
-            }
-            if (!(this instanceof PlayerTicker)) {
-                fluidPushVelocity = fluidPushVelocity.normalize();
-            }
-            fluidPushVelocity = fluidPushVelocity.multiply(speed);
-//            if (Math.abs(vec33.x) < 0.003 && Math.abs(vec33.z) < 0.003 && fluidPushVelocity.length() < 0.0045000000000000005) {
-//                fluidPushVelocity = fluidPushVelocity.normalize().scale(0.0045000000000000005);
-//            }
-
-            // player.velocity = player.velocity.add(fluidPushVelocity); // broken lol...
-
-            player.guessedFluidPushingVelocity = new Vec3(
-                    Math.max(Math.abs(fluidPushVelocity.x), player.guessedFluidPushingVelocity.x),
-                    Math.max(Math.abs(fluidPushVelocity.y), player.guessedFluidPushingVelocity.y),
-                    Math.max(Math.abs(fluidPushVelocity.z), player.guessedFluidPushingVelocity.z));
-        }
         player.fluidHeight.put(tag, maxFluidHeight);
-
         return found;
-    }
-
-    private boolean affectedByFluid(Fluid tag) {
-        Box box = player.boundingBox.contract(0.001F);
-
-        Mutable mutable = new Mutable();
-
-        int i = GenericMath.floor(box.minX);
-        int j = GenericMath.ceil(box.maxX);
-        int k = GenericMath.floor(box.minY);
-        int l = GenericMath.ceil(box.maxY);
-        int m = GenericMath.floor(box.minZ);
-        int n = GenericMath.ceil(box.maxZ);
-        for (int p = i; p < j; ++p) {
-            for (int q = k; q < l; ++q) {
-                for (int r = m; r < n; ++r) {
-                    FluidState fluidState = player.compensatedWorld.getFluidState(p, q, r);
-                    float f = (float) q + fluidState.getHeight(player, mutable);
-                    if (fluidState.fluid() != (tag) || !(f >= box.minY)) continue;
-                    Vec3 vec32 = fluidState.getFlow(player, Vector3i.from(p, q, r), fluidState);
-
-                    if (vec32.lengthSquared() > 0) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
     }
 
     protected void applyEffectsFromBlocks() {
@@ -210,15 +153,14 @@ public class EntityTicker {
         player.horizontalCollision = bl || bl2;
         player.verticalCollision = vec3.y != vec32.y;
         player.onGround = player.verticalCollision && vec3.y < 0.0;
-        // this.minorHorizontalCollision = this.horizontalCollision ? this.isHorizontalCollisionMinor(vec32) : false;
-        Vector3i blockPos = player.getOnPos(0.2F + 1.0E-5F);
-        BoarBlockState blockState = player.compensatedWorld.getBlockState(blockPos, 0);
-//        if (this.isLocalInstanceAuthoritative()) {
-//            this.checkFallDamage(vec32.y, this.onGround(), blockState, blockPos);
-//        }
+
         if (player.horizontalCollision) {
             player.velocity = new Vec3(bl ? 0 : player.velocity.x, player.velocity.y, bl2 ? 0 : player.velocity.z);
         }
+
+        // TODO: What the actual value actually? Player still able to bounce on slime despite being .375 block higher.
+        Vector3i blockPos = Vector3i.from((int) player.position.x, GenericMath.floor(player.position.y - 0.378F), (int) player.position.z);
+        BoarBlockState blockState = player.compensatedWorld.getBlockState(blockPos, 0);
 
         if (player.verticalCollision) {
             blockState.updateEntityMovementAfterFallOn(player, true);

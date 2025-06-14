@@ -1,14 +1,15 @@
 package ac.boar.anticheat.check.impl.prediction;
 
+import ac.boar.anticheat.Boar;
 import ac.boar.anticheat.check.api.annotations.CheckInfo;
 import ac.boar.anticheat.check.api.impl.OffsetHandlerCheck;
 import ac.boar.anticheat.check.impl.velocity.Velocity;
 import ac.boar.anticheat.player.BoarPlayer;
 import ac.boar.anticheat.prediction.engine.data.VectorType;
 
-@CheckInfo(name = "Prediction", type = "A")
-public class PredictionA extends OffsetHandlerCheck {
-    public PredictionA(BoarPlayer player) {
+@CheckInfo(name = "Prediction")
+public class Prediction extends OffsetHandlerCheck {
+    public Prediction(BoarPlayer player) {
         super(player);
     }
 
@@ -19,9 +20,9 @@ public class PredictionA extends OffsetHandlerCheck {
         }
 
         if (offset > player.getMaxOffset()) {
-            if (shouldDoFail()) {
+            if (shouldDoFail() && offset >= Boar.getConfig().alertThreshold()) {
                 if (player.bestPossibility.getType() == VectorType.VELOCITY) {
-                    player.getCheckHolder().get(Velocity.class).fail("o=" + offset);
+                    player.getCheckHolder().manuallyFail(Velocity.class, "o=" + offset);
                 } else {
                     this.fail("o=" + offset);
                 }
@@ -32,6 +33,6 @@ public class PredictionA extends OffsetHandlerCheck {
     }
 
     public boolean shouldDoFail() {
-        return player.sinceTeleport > 20 && !player.getTeleportUtil().isTeleporting();
+        return player.sinceTeleport > 20 && !player.getTeleportUtil().isTeleporting() && player.tickSinceBlockResync <= 0;
     }
 }

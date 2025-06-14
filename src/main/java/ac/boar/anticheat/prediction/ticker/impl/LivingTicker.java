@@ -1,5 +1,6 @@
 package ac.boar.anticheat.prediction.ticker.impl;
 
+import ac.boar.anticheat.collision.util.CuboidBlockIterator;
 import ac.boar.anticheat.compensated.CompensatedInventory;
 import ac.boar.anticheat.compensated.cache.entity.EntityCache;
 import ac.boar.anticheat.player.BoarPlayer;
@@ -17,7 +18,9 @@ import org.cloudburstmc.math.TrigMath;
 import org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
 import org.geysermc.geyser.inventory.item.BedrockEnchantment;
+import org.geysermc.geyser.level.block.Blocks;
 import org.geysermc.geyser.level.block.Fluid;
+import org.geysermc.geyser.level.block.type.BlockState;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.Effect;
 
 import java.util.List;
@@ -73,14 +76,52 @@ public class LivingTicker extends EntityTicker {
             player.getTeleportUtil().rewind(player.tick - 1);
         }
 
-        boolean jumping = player.getInputData().contains(PlayerAuthInputData.JUMPING) || player.getInputData().contains(PlayerAuthInputData.WANT_UP) ||
-                player.getInputData().contains(PlayerAuthInputData.START_JUMPING);
-        if (jumping) {
-            float g = player.isInLava() ? player.getFluidHeight(Fluid.LAVA) : player.getFluidHeight(Fluid.WATER);
-            if (g != 0) {
-                player.velocity = player.velocity.add(0, 0.04F, 0);
-            } else if (player.onGround && player.getInputData().contains(PlayerAuthInputData.START_JUMPING)) {
-                player.velocity = player.jumpFromGround(player.velocity);
+        boolean inScaffolding = false, onScaffolding = false;
+        final CuboidBlockIterator iterator = CuboidBlockIterator.iterator(player.boundingBox);
+        while (iterator.step()) {
+            int x = iterator.getX(), y = iterator.getY(), z = iterator.getZ();
+            if (player.compensatedWorld.isChunkLoaded(x, z)) {
+                int flooredY = GenericMath.floor(player.position.y);
+                BlockState state = player.compensatedWorld.getBlockState(x, y, z, 0).getState();
+                if (state.is(Blocks.SCAFFOLDING)) {
+                    if (y == flooredY && player.boundingBox.intersects(x, y, z, x + 1, y + 1, z + 1)) {
+                        inScaffolding = true;
+                    } else if (y + 1 == flooredY && player.boundingBox.offset(0, -1, 0).intersects(x, y, z, x + 1, y + 1, z + 1)) {
+                        onScaffolding = true;
+                    }
+                }
+            }
+        }
+
+        if (inScaffolding && player.unvalidatedPosition.subtract(player.prevUnvalidatedPosition).y > 0) {
+            if (player.getInputData().contains(PlayerAuthInputData.JUMPING) || player.getInputData().contains(PlayerAuthInputData.ASCEND_BLOCK)) {
+                player.velocity.y = 0.15F;
+            }
+        } else {
+            boolean jumping = player.getInputData().contains(PlayerAuthInputData.JUMPING) || player.getInputData().contains(PlayerAuthInputData.WANT_UP) ||
+                    player.getInputData().contains(PlayerAuthInputData.START_JUMPING);
+            if (jumping) {
+                float g = player.isInLava() ? player.getFluidHeight(Fluid.LAVA) : player.getFluidHeight(Fluid.WATER);
+                if (g != 0) {
+                    player.velocity = player.velocity.add(0, 0.04F, 0);
+                } else if (player.onGround && player.getInputData().contains(PlayerAuthInputData.START_JUMPING)) {
+                    player.velocity = player.jumpFromGround(player.velocity);
+                }
+            }
+        }
+
+        boolean descending = player.getInputData().contains(PlayerAuthInputData.SNEAKING) || player.getInputData().contains(PlayerAuthInputData.DESCEND_BLOCK);
+
+        player.scaffoldDescend = false;
+        BlockState state = player.compensatedWorld.getBlockState(player.getOnPos(1F), 0).getState();
+        if (descending) {
+            if (state.is(Blocks.POWDER_SNOW) ||  player.getInBlockState().is(Blocks.POWDER_SNOW)) {
+                player.velocity.y = -0.15F;
+            }
+
+            if (onScaffolding && Math.abs(player.unvalidatedTickEnd.y) - 0.15F < 0.01F) {
+                player.velocity.y = -0.15F;
+                player.scaffoldDescend = true;
             }
         }
 
