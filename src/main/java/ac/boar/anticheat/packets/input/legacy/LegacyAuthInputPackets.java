@@ -3,6 +3,7 @@ package ac.boar.anticheat.packets.input.legacy;
 import ac.boar.anticheat.check.api.Check;
 import ac.boar.anticheat.check.api.impl.OffsetHandlerCheck;
 import ac.boar.anticheat.compensated.cache.container.ContainerCache;
+import ac.boar.anticheat.data.Pose;
 import ac.boar.anticheat.data.input.VelocityData;
 import ac.boar.anticheat.player.BoarPlayer;
 import ac.boar.anticheat.prediction.UncertainRunner;
@@ -71,7 +72,7 @@ public class LegacyAuthInputPackets {
     }
 
     public static void correctInputData(final BoarPlayer player, final PlayerAuthInputPacket packet) {
-        if (player.isAbilityExempted()) {
+        if (player.isFullyExempted()) {
             return;
         }
 
@@ -137,7 +138,7 @@ public class LegacyAuthInputPackets {
                 case START_SNEAKING -> player.getFlagTracker().set(EntityFlag.SNEAKING, true);
                 case STOP_SNEAKING -> player.getFlagTracker().set(EntityFlag.SNEAKING, false);
 
-                case START_SWIMMING -> player.getFlagTracker().set(EntityFlag.SWIMMING, player.touchingWater && player.submergedInWater);
+                case START_SWIMMING -> player.getFlagTracker().set(EntityFlag.SWIMMING, true);
                 case STOP_SWIMMING -> player.getFlagTracker().set(EntityFlag.SWIMMING, false);
 
                 case START_FLYING -> player.flying = player.abilities.contains(Ability.MAY_FLY) || player.abilities.contains(Ability.FLYING);
@@ -155,6 +156,9 @@ public class LegacyAuthInputPackets {
                         player.getUseItemCache().getConsumer().accept(player.getUseItemCache());
                     }
                 }
+
+                case START_CRAWLING -> player.pose = Pose.SWIMMING;
+                case STOP_CRAWLING -> player.pose = Pose.STANDING;
             }
         }
 

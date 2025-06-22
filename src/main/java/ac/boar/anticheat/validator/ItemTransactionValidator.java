@@ -285,6 +285,12 @@ public final class ItemTransactionValidator {
                                 result = InteractionResult.SUCCESS;
                             }
 
+                            if (state.getValue(Properties.OPEN) != null) {
+                                player.compensatedWorld.updateBlock(position, 0, player.getSession().getBlockMappings().
+                                        getBedrockBlockId(state.withValue(Properties.OPEN, !state.getValue(Properties.OPEN)).javaId()));
+                                result = InteractionResult.SUCCESS;
+                            }
+
                             if (result != InteractionResult.TRY_WITH_EMPTY_HAND) {
                                 return true;
                             }
@@ -303,7 +309,7 @@ public final class ItemTransactionValidator {
                             BedrockInventoryTransactionTranslator.restoreCorrectBlock(player.getSession(), newBlockPos);
                             BedrockInventoryTransactionTranslator.restoreCorrectBlock(player.getSession(), packet.getBlockPosition());
 
-                            GeyserBoar.getLogger().severe("AIR PLACEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE");
+                            // GeyserBoar.getLogger().severe("AIR PLACEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE");
                             player.tickSinceBlockResync = 5;
                             return false;
                         }

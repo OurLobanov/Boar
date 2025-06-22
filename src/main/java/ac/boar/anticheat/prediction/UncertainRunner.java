@@ -4,6 +4,7 @@ import ac.boar.anticheat.player.BoarPlayer;
 import ac.boar.anticheat.util.MathUtil;
 import ac.boar.anticheat.util.math.Vec3;
 import lombok.RequiredArgsConstructor;
+import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
 
 // Things that I don't even bother account for...
 @RequiredArgsConstructor
@@ -20,16 +21,17 @@ public class UncertainRunner {
         }
 
         Vec3 actual = player.unvalidatedPosition.subtract(player.prevUnvalidatedPosition);
-        if (player.affectedByFluidPushing && actual.horizontalLength() - player.afterCollision.horizontalLength() <=
-                player.guessedFluidPushingVelocity.horizontalLength() + 0.014F &&
-                Math.abs(player.position.y - player.unvalidatedPosition.y) - extra <= player.getMaxOffset()) {
+        Vec3 predicted = player.position.subtract(player.prevUnvalidatedPosition);
+
+        if (Math.abs(player.position.y - player.unvalidatedPosition.y) - extra <= player.getMaxOffset() && player.soulSandBelow && actual.horizontalLengthSquared() < player.afterCollision.horizontalLengthSquared() && MathUtil.sameDirection(actual, predicted)) {
             extra = (float) offset;
         }
 
-        if (Math.abs(player.position.y - player.unvalidatedPosition.y) - extra <= player.getMaxOffset() &&
-                player.soulSandBelow && actual.horizontalLengthSquared() < player.afterCollision.horizontalLengthSquared() &&
-                MathUtil.sign(actual.x) == MathUtil.sign(player.afterCollision.x) && MathUtil.sign(actual.z) == MathUtil.sign(player.afterCollision.z)) {
-            extra = (float) offset;
+        // .... This is weird, no idea why.
+        if (!player.getFlagTracker().has(EntityFlag.SWIMMING) && player.hasDepthStrider) {
+            if (actual.horizontalLengthSquared() < predicted.horizontalLengthSquared() && Math.abs(player.unvalidatedTickEnd.y - player.velocity.y) < player.getMaxOffset()) {
+                extra = (float) offset;
+            }
         }
 
         return extra;

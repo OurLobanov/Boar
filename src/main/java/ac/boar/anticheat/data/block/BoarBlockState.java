@@ -1,21 +1,18 @@
 package ac.boar.anticheat.data.block;
 
 import ac.boar.anticheat.collision.BedrockCollision;
-import ac.boar.anticheat.data.inventory.ItemCache;
 import ac.boar.anticheat.player.BoarPlayer;
+import ac.boar.anticheat.util.block.BlockUtil;
 import ac.boar.anticheat.util.math.Box;
 import ac.boar.anticheat.util.math.Mutable;
 import ac.boar.anticheat.util.math.Vec3;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.cloudburstmc.math.vector.Vector3i;
-import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
-import org.geysermc.geyser.inventory.GeyserItemStack;
 import org.geysermc.geyser.level.block.Blocks;
 import org.geysermc.geyser.level.block.property.Properties;
 import org.geysermc.geyser.level.block.type.BlockState;
 import org.geysermc.geyser.level.physics.BoundingBox;
-import org.geysermc.geyser.session.cache.TagCache;
 import org.geysermc.geyser.session.cache.tags.BlockTag;
 import org.geysermc.geyser.translator.collision.BlockCollision;
 import org.geysermc.geyser.translator.collision.SolidCollision;
@@ -24,6 +21,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.Effect;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @RequiredArgsConstructor
 @Getter
@@ -53,6 +51,10 @@ public class BoarBlockState {
     }
 
     public void entityInside(final BoarPlayer player, Mutable pos) {
+        if (this.state.is(Blocks.POWDER_SNOW) && player.boundingBox.offset(0, 1.0E-3F, 0).contains(pos.getX(), pos.getY(), pos.getZ())) { // UHHHHHHHHHHHHH
+            return;
+        }
+
         if (this.state.is(Blocks.BUBBLE_COLUMN)) {
             boolean drag = this.state.getValue(Properties.DRAG);
 
@@ -75,7 +77,7 @@ public class BoarBlockState {
         Vec3 movementMultiplier = Vec3.ZERO;
         if (state.is(Blocks.SWEET_BERRY_BUSH)) {
             movementMultiplier = new Vec3(0.8F, 0.75F, 0.8F);
-        } else if (state.is(Blocks.POWDER_SNOW)) {
+        } else if (state.is(Blocks.POWDER_SNOW) && player.position.y < pos.getY() + 1 - 1.0E-5f) {
             movementMultiplier = new Vec3(0.9F, 1.5F, 0.9F);
         } else if (state.is(Blocks.COBWEB)) {
             movementMultiplier = new Vec3(0.25F, 0.05F, 0.25F);
@@ -115,22 +117,18 @@ public class BoarBlockState {
     }
 
     public void updateEntityMovementAfterFallOn(BoarPlayer player, boolean living) {
-        final TagCache cache = player.getSession().getTagCache();
-
-        if (cache.is(BlockTag.BEDS, state.block()) && player.velocity.y < 0.0 && !player.getFlagTracker().has(EntityFlag.SNEAKING)) {
-            final float d = living ? 1.0F : 0.8F;
-            player.velocity.y = -player.velocity.y * 0.75F * d;
-            if (player.velocity.y > 0.75) {
-                player.velocity.y = 0.75F;
-            }
-
-            return;
-        }
-
         player.velocity.y = 0;
     }
 
     public List<Box> findCollision(BoarPlayer player, Vector3i pos, Box playerAABB, boolean checkAAB) {
+        BlockState state = this.state;
+
+        if (player.getSession().getTagCache().is(BlockTag.FENCES, state.block())) {
+            state = BlockUtil.findFenceBlockState(player, getState(), pos);
+        } else if (state.is(Blocks.IRON_BARS) || state.toString().toLowerCase(Locale.ROOT).contains("glass_pane")) {
+            state = BlockUtil.findIronBarsBlockState(player, getState(), pos);
+        }
+
         final List<Box> list = new ArrayList<>();
         final List<Box> collisions = BedrockCollision.getCollisionBox(player, pos, state);
         if (collisions != null) {

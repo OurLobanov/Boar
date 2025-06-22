@@ -1,9 +1,9 @@
 package ac.boar.anticheat.check.api;
 
+import ac.boar.anticheat.Boar;
 import ac.boar.anticheat.check.api.annotations.CheckInfo;
 import ac.boar.anticheat.check.api.annotations.Experimental;
 import ac.boar.anticheat.player.BoarPlayer;
-import ac.boar.anticheat.util.ChatUtil;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -28,10 +28,10 @@ public class Check {
         }
 
         if (this.experimental) {
-            builder.append("§2(Experimental)");
+            builder.append(" §a(Experimental)");
         }
 
         builder.append(" §7x").append(vl).append(" ").append(verbose);
-        ChatUtil.alert(player, builder.toString());
+        Boar.getInstance().getAlertManager().alert(builder.toString());
     }
 }

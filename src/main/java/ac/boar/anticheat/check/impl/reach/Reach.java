@@ -1,11 +1,11 @@
 package ac.boar.anticheat.check.impl.reach;
 
+import ac.boar.anticheat.Boar;
 import ac.boar.anticheat.check.api.annotations.CheckInfo;
 import ac.boar.anticheat.check.api.annotations.Experimental;
 import ac.boar.anticheat.check.api.impl.PacketCheck;
 import ac.boar.anticheat.compensated.cache.entity.EntityCache;
 import ac.boar.anticheat.player.BoarPlayer;
-import ac.boar.anticheat.util.ChatUtil;
 import ac.boar.anticheat.util.MathUtil;
 import ac.boar.anticheat.util.math.Box;
 import ac.boar.anticheat.util.math.Vec3;
@@ -20,7 +20,7 @@ import org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket;
 import java.util.Optional;
 
 @Experimental
-@CheckInfo(name = "Reach", type = "A")
+@CheckInfo(name = "Reach")
 public final class Reach extends PacketCheck {
     public Reach(BoarPlayer player) {
         super(player);
@@ -50,15 +50,17 @@ public final class Reach extends PacketCheck {
         final ReachResult result = calculateReach(entity);
 
         double distance = result.distance();
-        if (distance > 3.005) {
+        if (distance > Boar.getConfig().toleranceReach()) {
             if (distance != Double.MAX_VALUE) {
-                fail("d=" + distance + ", deltaTicks=" + result.deltaTicks());
+                fail("d=" + distance);
             } else {
                 // This seems to be falsing from time to time and ehmmmm, this sucks lol.
                 // fail("hitboxes!" + ", deltaTicks=" + result.deltaTicks());
             }
 
             event.setCancelled(true);
+        } else {
+            // Boar.getInstance().getAlertManager().alert("Distance=" + distance + "," + result.deltaTicks());
         }
 
         if (player.inputMode == InputMode.TOUCH) {
@@ -68,7 +70,7 @@ public final class Reach extends PacketCheck {
             }
         }
 
-        ChatUtil.alert(player,"d=" + distance);
+        // ChatUtil.alert(player,"d=" + distance);
     }
 
     public ReachResult calculateReach(final EntityCache entity) {
@@ -101,7 +103,7 @@ public final class Reach extends PacketCheck {
     }
 
     private Vec3 getEntityHitResult(final Box box, final Vec3 min, final Vec3 max) {
-        Box lv5 = box.expand(0.1F); // Seems to be the case when debugging/comparing with 1.21 java.
+        Box lv5 = box.expand(0.1F);
         Optional<Vec3> vec3 = lv5.clip(min, max);
         if (lv5.contains(min)) {
             return min;
